@@ -1,0 +1,5 @@
+{
+  "name": "Iraq University Data Control Center",
+  "description": "Internal data management application for Iraq education platform. Handles imports, validation, and quality control of university data.",
+  "requestFramePermissions": []
+}
