@@ -85,6 +85,7 @@ export default function App() {
   const [scraperLogs, setScraperLogs] = useState<string[]>([]);
   const [scrapingInterval, setScrapingInterval] = useState<any>(null);
   const [isCleaning, setIsCleaning] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // --- Data Fetching ---
   const fetchData = async () => {
@@ -238,6 +239,48 @@ export default function App() {
     }
   };
 
+  const exportToCSV = (data: any[]) => {
+    if (data.length === 0) return;
+    
+    // Define headers
+    const headers = ['ID', 'Name (AR)', 'Name (EN)', 'Type', 'Website', 'Verified'];
+    
+    // Map data to rows
+    const rows = data.map(u => [
+      u.id,
+      `"${u.name_ar}"`,
+      `"${u.name_en || ''}"`,
+      u.type,
+      u.website_url || '',
+      u.is_verified
+    ]);
+
+    // Combine into CSV string
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(r => r.join(','))
+    ].join('\n');
+
+    // Create download link
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `iraq_universities_export_${new Date().getTime()}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    setMessage({ type: 'success', text: `Exported ${data.length} records to CSV.` });
+  };
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
   // --- Render Helpers ---
   const renderContent = () => {
     if (!supabaseUrl || !supabaseAnonKey) {
@@ -388,34 +431,85 @@ export default function App() {
         );
 
       case 'universities':
+        const selectedData = universities.filter(u => selectedIds.includes(u.id));
+        
         return (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <div className="relative w-96">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input 
-                  type="text" 
-                  placeholder="Search universities..." 
-                  className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                />
+              <div className="flex items-center gap-4">
+                <div className="relative w-96">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input 
+                    type="text" 
+                    placeholder="Search universities..." 
+                    className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  />
+                </div>
+                {selectedIds.length > 0 && (
+                  <motion.div 
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="flex items-center gap-2"
+                  >
+                    <button 
+                      onClick={() => exportToCSV(selectedData)}
+                      className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl font-bold text-sm hover:bg-indigo-100 transition-all border border-indigo-100"
+                    >
+                      <Download size={18} />
+                      Export Selected ({selectedIds.length})
+                    </button>
+                    <button 
+                      onClick={() => setSelectedIds([])}
+                      className="text-slate-400 hover:text-slate-600 text-xs font-bold px-2"
+                    >
+                      Clear
+                    </button>
+                  </motion.div>
+                )}
               </div>
-              <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
-                <School size={18} />
-                Add University
-              </button>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => exportToCSV(universities)}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold text-sm hover:bg-slate-200 transition-all"
+                >
+                  <Download size={18} />
+                  Export All
+                </button>
+                <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
+                  <School size={18} />
+                  Add University
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {universities.map((u) => (
-                <div key={u.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all group">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-                      <School size={24} />
+                <div 
+                  key={u.id} 
+                  onClick={() => toggleSelection(u.id)}
+                  className={cn(
+                    "bg-white p-6 rounded-2xl border transition-all group cursor-pointer relative",
+                    selectedIds.includes(u.id) 
+                      ? "border-blue-500 ring-2 ring-blue-50 shadow-md" 
+                      : "border-slate-100 shadow-sm hover:shadow-md"
+                  )}
+                >
+                  <div className="absolute top-4 right-4">
+                    <div className={cn(
+                      "w-5 h-5 rounded-md border flex items-center justify-center transition-colors",
+                      selectedIds.includes(u.id) 
+                        ? "bg-blue-600 border-blue-600" 
+                        : "bg-white border-slate-200 group-hover:border-blue-400"
+                    )}>
+                      {selectedIds.includes(u.id) && <CheckCircle2 size={14} className="text-white" />}
                     </div>
-                    <div className="flex gap-1">
-                      <button className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all">
-                        <MoreVertical size={18} />
-                      </button>
+                  </div>
+                  <div className="flex items-start justify-between mb-4">
+                    <div className={cn(
+                      "w-12 h-12 rounded-xl flex items-center justify-center transition-colors",
+                      selectedIds.includes(u.id) ? "bg-blue-100 text-blue-600" : "bg-slate-50 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600"
+                    )}>
+                      <School size={24} />
                     </div>
                   </div>
                   <h4 className="text-lg font-bold text-slate-900 mb-1">{u.name_ar}</h4>
